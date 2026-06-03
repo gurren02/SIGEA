@@ -123,4 +123,43 @@ class User
         $teacher = $stmt->fetch();
         return $teacher ?: null;
     }
+
+    public static function assignedSubjectIds(int $teacherId): array
+    {
+        $stmt = Database::get()->prepare('SELECT subject_id FROM teacher_subjects WHERE teacher_id = ?');
+        $stmt->execute([$teacherId]);
+        return array_map('intval', array_column($stmt->fetchAll(), 'subject_id'));
+    }
+
+    public static function assignSubjects(int $teacherId, array $subjectIds): void
+    {
+        $db = Database::get();
+        $db->beginTransaction();
+        $db->prepare('DELETE FROM teacher_subjects WHERE teacher_id = ?')->execute([$teacherId]);
+        $stmt = $db->prepare('INSERT INTO teacher_subjects (teacher_id, subject_id) VALUES (?, ?)');
+        foreach ($subjectIds as $subjectId) {
+            $stmt->execute([$teacherId, (int) $subjectId]);
+        }
+        $db->commit();
+    }
+
+    public static function subjectsByTeacher(int $teacherId): array
+    {
+        $stmt = Database::get()->prepare(
+            "SELECT s.*
+             FROM subjects s
+             INNER JOIN teacher_subjects ts ON ts.subject_id = s.id
+             WHERE ts.teacher_id = ?
+             ORDER BY s.name"
+        );
+        $stmt->execute([$teacherId]);
+        return $stmt->fetchAll();
+    }
+
+    public static function delete(int $id): void
+    {
+        $stmt = Database::get()->prepare('DELETE FROM users WHERE id = ?');
+        $stmt->execute([$id]);
+    }
 }
+

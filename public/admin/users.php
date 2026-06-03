@@ -3,15 +3,29 @@ require_once __DIR__ . '/../../app/Core/bootstrap.php';
 $user = require_role('admin');
 
 if (is_post()) {
-    $password = $_POST['password'] ?? '';
-    if (!password_is_valid($password)) {
-        flash('error', 'La contrasena debe tener 8 caracteres, una mayuscula, un numero y un signo.');
+    if (isset($_POST['action']) && $_POST['action'] === 'delete') {
+        $userId = (int) ($_POST['user_id'] ?? 0);
+        if ($userId === (int) $user['id']) {
+            flash('error', 'No puedes eliminar tu propio usuario.');
+        } else {
+            try {
+                User::delete($userId);
+                flash('success', 'Usuario eliminado correctamente.');
+            } catch (Throwable $e) {
+                flash('error', 'No se pudo eliminar el usuario.');
+            }
+        }
     } else {
-        try {
-            User::create($_POST);
-            flash('success', 'Usuario creado correctamente.');
-        } catch (Throwable $e) {
-            flash('error', 'No se pudo crear el usuario. Verifica que el correo no este repetido.');
+        $password = $_POST['password'] ?? '';
+        if (!password_is_valid($password)) {
+            flash('error', 'La contrasena debe tener 8 caracteres, una mayuscula, un numero y un signo.');
+        } else {
+            try {
+                User::create($_POST);
+                flash('success', 'Usuario creado correctamente.');
+            } catch (Throwable $e) {
+                flash('error', 'No se pudo crear el usuario. Verifica que el correo no este repetido.');
+            }
         }
     }
     redirect('/admin/users.php');
@@ -43,6 +57,7 @@ render('header', compact('pageTitle'));
                     <th>Correo</th>
                     <th>Rol</th>
                     <th>Clave institucional</th>
+                    <th style="width: 80px; text-align: center;">Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -57,6 +72,19 @@ render('header', compact('pageTitle'));
                     <td><?= e($row['email']) ?></td>
                     <td><span class="role-badge role-badge--<?= e($row['role']) ?>"><?= e(role_label($row['role'])) ?></span></td>
                     <td><?= e($row['institutional_id']) ?></td>
+                    <td style="text-align: center;">
+                        <?php if ((int)$row['id'] !== (int)$user['id']): ?>
+                            <form method="post" action="/admin/users.php" style="display:inline;" onsubmit="return confirm('¿Estás seguro de que deseas eliminar este usuario? Esta acción es irreversible.');">
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="user_id" value="<?= (int)$row['id'] ?>">
+                                <button type="submit" class="icon-button" title="Eliminar usuario">
+                                    <span class="material-symbols-rounded">delete</span>
+                                </button>
+                            </form>
+                        <?php else: ?>
+                            <span class="muted" style="font-size: 12px; font-style: italic;">Actual</span>
+                        <?php endif; ?>
+                    </td>
                 </tr>
             <?php endforeach; ?>
             </tbody>

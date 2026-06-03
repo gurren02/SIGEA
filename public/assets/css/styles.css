@@ -159,7 +159,7 @@ h1, h2, h3, h4 {
 }
 
 /* ── Form Elements ─────────────────────────────────────────── */
-input,
+input:not([type="checkbox"]):not([type="radio"]),
 select,
 textarea {
   width: 100%;
@@ -185,7 +185,7 @@ select {
   padding-right: 36px;
 }
 
-input:focus,
+input:not([type="checkbox"]):not([type="radio"]):focus,
 select:focus,
 textarea:focus {
   border-color: var(--blue-vivid);
@@ -193,7 +193,7 @@ textarea:focus {
   box-shadow: 0 0 0 3px rgba(37,99,235,.12);
 }
 
-input:disabled {
+input:not([type="checkbox"]):not([type="radio"]):disabled {
   background: #f1f5f9;
   color: var(--gray);
   cursor: not-allowed;
@@ -985,6 +985,12 @@ tbody tr:hover {
   background: rgba(255,255,255,.80);
 }
 
+.question-pick:has(input:checked) {
+  border-color: var(--blue-vivid);
+  background: rgba(37,99,235,.06);
+  box-shadow: 0 0 0 3px rgba(37,99,235,.10);
+}
+
 .question-pick.is-visible { display: grid; }
 
 .question-pick input {
@@ -1544,7 +1550,8 @@ tbody tr:hover {
   background: rgba(34,197,94,.06);
 }
 
-.correct-pick-item input[type="radio"] {
+.correct-pick-item input[type="radio"],
+.correct-pick-item input[type="checkbox"] {
   width: auto;
   margin: 0;
   accent-color: var(--green);

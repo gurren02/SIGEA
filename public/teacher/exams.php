@@ -13,12 +13,17 @@ if (is_post()) {
 }
 
 $exams = Exam::byTeacher($user['id']);
-$subjects = Exam::subjects();
+$subjects = User::subjectsByTeacher($user['id']);
 $students = User::studentsByTeacher($user['id']);
 $bank = Exam::bankByTeacher($user['id']);
 $pageTitle = 'Generar examenes';
 render('header', compact('pageTitle'));
 ?>
+<?php if (!$subjects): ?>
+    <div class="alert alert-danger" style="margin-bottom:20px;">
+        No tienes materias asignadas por el administrador. Ponte en contacto con el administrador para poder generar examenes.
+    </div>
+<?php endif; ?>
 <form class="panel exam-builder" method="post" id="exam-wizard">
     <div class="section-head">
         <div>
@@ -31,7 +36,8 @@ render('header', compact('pageTitle'));
     <ol class="wizard-steps">
         <li class="is-active" data-step-indicator="1">Datos</li>
         <li data-step-indicator="2">Preguntas</li>
-        <li data-step-indicator="3">Parametros</li>
+        <li data-step-indicator="3">Alumnos</li>
+        <li data-step-indicator="4">Parametros</li>
     </ol>
 
     <section class="phase-block wizard-step is-active" data-step="1">
@@ -99,10 +105,46 @@ render('header', compact('pageTitle'));
 
     <section class="phase-block wizard-step" data-step="3">
         <span class="phase-badge">Paso 3</span>
+        <div class="section-head">
+            <div>
+                <h3>Destinatarios del examen</h3>
+                <p class="muted">Selecciona los alumnos que tendrán asignado este examen.</p>
+            </div>
+        </div>
+
+        <div class="student-pick-list">
+            <?php foreach ($students as $student): ?>
+                <label class="student-pick-card is-checked">
+                    <input type="checkbox" name="students[]" value="<?= (int) $student['id'] ?>" checked>
+                    <span class="student-pick-avatar"><?= strtoupper(substr($student['name'], 0, 1)) ?></span>
+                    <span class="student-pick-info">
+                        <strong><?= e($student['name']) ?></strong>
+                        <small><?= e($student['email']) ?></small>
+                    </span>
+                    <span class="material-symbols-rounded student-pick-check">check_circle</span>
+                </label>
+            <?php endforeach; ?>
+            <?php if (!$students): ?>
+                <div class="modal-empty">
+                    <span class="material-symbols-rounded">person_off</span>
+                    <p>No tienes alumnos asignados. Pide al administrador que te asigne estudiantes.</p>
+                </div>
+            <?php endif; ?>
+        </div>
+        <div class="wizard-actions">
+            <button class="button button-ghost" type="button" data-wizard-prev>Anterior</button>
+            <button class="button button-primary" type="button" data-wizard-next>Siguiente</button>
+        </div>
+    </section>
+
+    <section class="phase-block wizard-step" data-step="4">
+        <span class="phase-badge">Paso 4</span>
         <h3>Parametros para generar</h3>
         <div class="form-row">
             <label>Numero de preguntas
-                <input type="number" min="1" name="count" id="exam-count" value="1" required>
+                <select name="count" id="exam-count" required>
+                    <option value="1">1</option>
+                </select>
             </label>
             <label>Como se tomaran
                 <select name="selection_mode">

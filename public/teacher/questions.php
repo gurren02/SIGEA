@@ -12,11 +12,17 @@ if (is_post()) {
     redirect('/teacher/questions.php');
 }
 
-$subjects  = Exam::subjects();
+$subjects  = User::subjectsByTeacher($user['id']);
 $bank      = Exam::bankByTeacher($user['id']);
 $pageTitle = 'Banco de preguntas';
 render('header', compact('pageTitle'));
 ?>
+
+<?php if (!$subjects): ?>
+    <div class="alert alert-danger" style="margin-bottom:20px;">
+        No tienes materias asignadas por el administrador. Ponte en contacto con el administrador para poder registrar preguntas.
+    </div>
+<?php endif; ?>
 
 <section class="panel">
     <div class="section-head">
@@ -150,15 +156,15 @@ render('header', compact('pageTitle'));
                 <?php endforeach; ?>
             </div>
 
-            <!-- Respuesta correcta -->
+            <!-- Respuesta(s) correcta(s) -->
             <p class="modal-section-label" style="margin-top:18px;">
                 <span class="material-symbols-rounded">check_circle</span>
-                Respuesta correcta
+                Respuesta(s) correcta(s) (puedes seleccionar más de una)
             </p>
             <div class="correct-pick">
                 <?php foreach (['A','B','C','D'] as $i => $letter): ?>
                 <label class="correct-pick-item">
-                    <input type="radio" name="correct" value="<?= $i ?>" <?= $i === 0 ? 'checked' : '' ?>>
+                    <input type="checkbox" name="correct[]" value="<?= $i ?>" <?= $i === 0 ? 'checked' : '' ?>>
                     <span class="option-letter option-letter--sm"><?= $letter ?></span>
                     Opcion <?= $letter ?>
                 </label>

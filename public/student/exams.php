@@ -25,9 +25,9 @@ render('header', compact('pageTitle'));
                     <td><?= $exam['attempt_id'] ? 'Contestado' : 'Pendiente' ?></td>
                     <td>
                         <?php if (!$exam['attempt_id']): ?>
-                            <a class="button button-primary" href="/student/take_exam.php?id=<?= (int) $exam['id'] ?>">Responder</a>
+                            <a class="button button-primary exam-action-btn" data-exam-id="<?= (int) $exam['id'] ?>" href="/student/take_exam.php?id=<?= (int) $exam['id'] ?>">Responder</a>
                         <?php else: ?>
-                            <span class="pill">Calificado</span>
+                            <span class="pill" data-clear-exam-id="<?= (int) $exam['id'] ?>">Calificado</span>
                         <?php endif; ?>
                     </td>
                 </tr>

@@ -19,7 +19,7 @@ render('header', compact('pageTitle'));
                     <td><?= e($result['teacher_name']) ?></td>
                     <td><?= e($result['score']) ?>/<?= e($result['total_score']) ?></td>
                     <td><?= $result['validated_at'] ? 'Validado' : 'Pendiente' ?></td>
-                    <td><a class="button button-warning" href="/student/result_pdf.php?id=<?= (int) $result['id'] ?>">Exportar PDF</a></td>
+                    <td><a class="button button-warning" data-clear-exam-id="<?= (int) $result['exam_id'] ?>" href="/student/result_pdf.php?id=<?= (int) $result['id'] ?>">Exportar PDF</a></td>
                 </tr>
             <?php endforeach; ?>
             <?php if (!$results): ?><tr><td colspan="7">Aun no tienes resultados.</td></tr><?php endif; ?>

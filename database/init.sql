@@ -1,3 +1,5 @@
+SET NAMES utf8mb4;
+
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(120) NOT NULL,
@@ -22,6 +24,14 @@ CREATE TABLE IF NOT EXISTS teacher_students (
     PRIMARY KEY (teacher_id, student_id),
     CONSTRAINT fk_teacher_students_teacher FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT fk_teacher_students_student FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS teacher_subjects (
+    teacher_id INT NOT NULL,
+    subject_id INT NOT NULL,
+    PRIMARY KEY (teacher_id, subject_id),
+    CONSTRAINT fk_teacher_subjects_teacher FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_teacher_subjects_subject FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS question_bank (
@@ -136,6 +146,11 @@ INSERT IGNORE INTO teacher_students (teacher_id, student_id) VALUES
     (5, 8),
     (6, 9);
 
+INSERT IGNORE INTO teacher_subjects (teacher_id, subject_id) VALUES
+    (4, 1), (4, 2), (4, 3), (4, 4),
+    (5, 5), (5, 6), (5, 7), (5, 8),
+    (6, 9), (6, 10), (6, 11), (6, 12);
+
 DELIMITER //
 
 DROP PROCEDURE IF EXISTS seed_question_bank //
@@ -143,6 +158,7 @@ CREATE PROCEDURE seed_question_bank()
 BEGIN
     DECLARE v_teacher INT DEFAULT 4;
     DECLARE v_subject INT DEFAULT 1;
+    DECLARE v_subject_limit INT DEFAULT 4;
     DECLARE v_unit INT DEFAULT 1;
     DECLARE v_question INT DEFAULT 1;
     DECLARE v_question_id INT;
@@ -240,8 +256,18 @@ BEGIN
         (12, 5, 'despliegue y operacion', 'version', 'monitoreo', 'incidencia', 'automatizar entregas', 'pipeline ci cd', 'desplegar manualmente sin registro', 'mantener software en produccion');
 
     WHILE v_teacher <= 6 DO
-        SET v_subject = 1;
-        WHILE v_subject <= 12 DO
+        IF v_teacher = 4 THEN
+            SET v_subject = 1;
+            SET v_subject_limit = 4;
+        ELSEIF v_teacher = 5 THEN
+            SET v_subject = 5;
+            SET v_subject_limit = 8;
+        ELSE
+            SET v_subject = 9;
+            SET v_subject_limit = 12;
+        END IF;
+
+        WHILE v_subject <= v_subject_limit DO
             SELECT name INTO v_subject_name FROM subjects WHERE id = v_subject;
             SET v_unit = 1;
             WHILE v_unit <= 5 DO
@@ -256,10 +282,10 @@ BEGIN
                         SET v_type = 'true_false';
                         SET v_true_correct = IF(v_question IN (5, 15), 1, 0);
                         SET v_text = CASE v_question
-                            WHEN 5 THEN CONCAT('Unidad ', v_unit, ' de ', v_subject_name, ' afirma que ', v_concept1, ' ayuda a ', v_result)
-                            WHEN 10 THEN CONCAT('Unidad ', v_unit, ' de ', v_subject_name, ' afirma que ', v_error, ' es una practica recomendada')
-                            WHEN 15 THEN CONCAT('Unidad ', v_unit, ' de ', v_subject_name, ' afirma que ', v_tool, ' se relaciona con ', v_practice)
-                            ELSE CONCAT('Unidad ', v_unit, ' de ', v_subject_name, ' afirma que se debe ignorar ', v_concept2, ' para lograr ', v_result)
+                            WHEN 5 THEN CONCAT('¿Es correcto afirmar que ', v_concept1, ' ayuda a ', v_result, '?')
+                            WHEN 10 THEN CONCAT('¿Es ', v_error, ' una practica recomendada?')
+                            WHEN 15 THEN CONCAT('¿Se relaciona ', v_tool, ' directamente con ', v_practice, '?')
+                            ELSE CONCAT('¿Se debe ignorar ', v_concept2, ' para lograr ', v_result, '?')
                         END;
                         INSERT INTO question_bank (teacher_id, subject_id, unit, text, type, score)
                         VALUES (v_teacher, v_subject, v_unit, v_text, v_type, 1);
@@ -270,22 +296,22 @@ BEGIN
                     ELSE
                         SET v_type = 'multiple_choice';
                         SET v_text = CASE v_question
-                            WHEN 1 THEN CONCAT('Unidad ', v_unit, ' de ', v_subject_name, ' que concepto se relaciona mejor con ', v_focus)
-                            WHEN 2 THEN CONCAT('Unidad ', v_unit, ' de ', v_subject_name, ' que practica fortalece ', v_focus)
-                            WHEN 3 THEN CONCAT('Unidad ', v_unit, ' de ', v_subject_name, ' que herramienta o tecnica apoya ', v_focus)
-                            WHEN 4 THEN CONCAT('Unidad ', v_unit, ' de ', v_subject_name, ' que resultado se busca al aplicar ', v_concept1)
-                            WHEN 6 THEN CONCAT('Unidad ', v_unit, ' de ', v_subject_name, ' que elemento complementa a ', v_concept1)
-                            WHEN 7 THEN CONCAT('Unidad ', v_unit, ' de ', v_subject_name, ' que error debe evitarse durante ', v_focus)
-                            WHEN 8 THEN CONCAT('Unidad ', v_unit, ' de ', v_subject_name, ' que concepto permite explicar ', v_result)
-                            WHEN 9 THEN CONCAT('Unidad ', v_unit, ' de ', v_subject_name, ' que accion conviene antes de resolver un ejercicio')
-                            WHEN 11 THEN CONCAT('Unidad ', v_unit, ' de ', v_subject_name, ' cual opcion representa una evidencia de dominio')
-                            WHEN 12 THEN CONCAT('Unidad ', v_unit, ' de ', v_subject_name, ' que relacion es correcta dentro del tema')
-                            WHEN 13 THEN CONCAT('Unidad ', v_unit, ' de ', v_subject_name, ' que recurso se usa para comprobar el procedimiento')
-                            WHEN 14 THEN CONCAT('Unidad ', v_unit, ' de ', v_subject_name, ' que decision mejora la calidad del resultado')
-                            WHEN 16 THEN CONCAT('Unidad ', v_unit, ' de ', v_subject_name, ' que concepto aparece como base del aprendizaje')
-                            WHEN 17 THEN CONCAT('Unidad ', v_unit, ' de ', v_subject_name, ' que opcion describe mejor el proposito de ', v_practice)
-                            WHEN 18 THEN CONCAT('Unidad ', v_unit, ' de ', v_subject_name, ' que alternativa ayuda a detectar errores')
-                            ELSE CONCAT('Unidad ', v_unit, ' de ', v_subject_name, ' que respuesta resume el objetivo principal')
+                            WHEN 1 THEN CONCAT('¿Que concepto se relaciona mejor con ', v_focus, '?')
+                            WHEN 2 THEN CONCAT('¿Que practica fortalece ', v_focus, '?')
+                            WHEN 3 THEN CONCAT('¿Que herramienta o tecnica apoya ', v_focus, '?')
+                            WHEN 4 THEN CONCAT('¿Que resultado se busca al aplicar ', v_concept1, '?')
+                            WHEN 6 THEN CONCAT('¿Que elemento complementa a ', v_concept1, '?')
+                            WHEN 7 THEN CONCAT('¿Que error debe evitarse durante ', v_focus, '?')
+                            WHEN 8 THEN CONCAT('¿Que concepto permite explicar ', v_result, '?')
+                            WHEN 9 THEN CONCAT('¿Que accion conviene antes de resolver un ejercicio?')
+                            WHEN 11 THEN CONCAT('¿Cual opcion representa una evidencia de dominio?')
+                            WHEN 12 THEN CONCAT('¿Que relacion es correcta dentro del tema?')
+                            WHEN 13 THEN CONCAT('¿Que recurso se usa para comprobar el procedimiento?')
+                            WHEN 14 THEN CONCAT('¿Que decision mejora la calidad del resultado?')
+                            WHEN 16 THEN CONCAT('¿Que concepto aparece como base del aprendizaje?')
+                            WHEN 17 THEN CONCAT('¿Que opcion describe mejor el proposito de ', v_practice, '?')
+                            WHEN 18 THEN CONCAT('¿Que alternativa ayuda a detectar errores?')
+                            ELSE CONCAT('¿Que respuesta resume el objetivo principal?')
                         END;
                         SET v_correct = CASE v_question
                             WHEN 1 THEN v_concept1
@@ -321,14 +347,25 @@ BEGIN
                             WHEN 8 THEN v_concept2
                             ELSE 'elegir una opcion al azar'
                         END;
+                        
                         INSERT INTO question_bank (teacher_id, subject_id, unit, text, type, score)
                         VALUES (v_teacher, v_subject, v_unit, v_text, v_type, 1);
                         SET v_question_id = LAST_INSERT_ID();
-                        INSERT INTO question_bank_options (bank_question_id, option_text, is_correct) VALUES
-                            (v_question_id, v_correct, 1),
-                            (v_question_id, v_wrong1, 0),
-                            (v_question_id, v_wrong2, 0),
-                            (v_question_id, v_wrong3, 0);
+                        
+                        -- If v_question is a multiple of 3, seed with 2 correct options
+                        IF v_question % 3 = 0 THEN
+                            INSERT INTO question_bank_options (bank_question_id, option_text, is_correct) VALUES
+                                (v_question_id, v_correct, 1),
+                                (v_question_id, CONCAT(v_correct, ' complementario'), 1),
+                                (v_question_id, v_wrong1, 0),
+                                (v_question_id, v_wrong2, 0);
+                        ELSE
+                            INSERT INTO question_bank_options (bank_question_id, option_text, is_correct) VALUES
+                                (v_question_id, v_correct, 1),
+                                (v_question_id, v_wrong1, 0),
+                                (v_question_id, v_wrong2, 0),
+                                (v_question_id, v_wrong3, 0);
+                        END IF;
                     END IF;
                     SET v_question = v_question + 1;
                 END WHILE;
@@ -353,5 +390,13 @@ CREATE TABLE IF NOT EXISTS password_resets (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     KEY idx_resets_email (email),
     KEY idx_resets_token (token)
+);
+
+CREATE TABLE IF NOT EXISTS exam_students (
+    exam_id INT NOT NULL,
+    student_id INT NOT NULL,
+    PRIMARY KEY (exam_id, student_id),
+    CONSTRAINT fk_exam_students_exam FOREIGN KEY (exam_id) REFERENCES exams(id) ON DELETE CASCADE,
+    CONSTRAINT fk_exam_students_student FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE
 );
 

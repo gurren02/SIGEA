@@ -54,8 +54,7 @@ document.querySelectorAll('.student-pick-card').forEach((card) => {
 
   card.classList.toggle('is-checked', checkbox.checked);
 
-  card.addEventListener('click', () => {
-    checkbox.checked = !checkbox.checked;
+  checkbox.addEventListener('change', () => {
     card.classList.toggle('is-checked', checkbox.checked);
   });
 });
@@ -103,9 +102,17 @@ function updateSelectedQuestions() {
   const selected = document.querySelectorAll('.question-pick.is-visible input[type="checkbox"]:checked').length;
   if (selectedQuestionCount) selectedQuestionCount.textContent = String(selected);
   if (examCount) {
-    examCount.max = selected > 0 ? String(selected) : '1';
-    if (Number(examCount.value) > selected || Number(examCount.value) < 1) {
-      examCount.value = selected > 0 ? String(selected) : '1';
+    const currentValue = Number(examCount.value) || 1;
+    examCount.innerHTML = '';
+    const maxVal = selected > 0 ? selected : 1;
+    for (let i = 1; i <= maxVal; i++) {
+      const option = document.createElement('option');
+      option.value = String(i);
+      option.textContent = String(i);
+      if (i === currentValue || (i === maxVal && currentValue > maxVal)) {
+        option.selected = true;
+      }
+      examCount.appendChild(option);
     }
   }
 }
@@ -132,6 +139,9 @@ function canMoveFromStep(step) {
   if (step === 2) {
     return document.querySelectorAll('.question-pick.is-visible input[type="checkbox"]:checked').length > 0;
   }
+  if (step === 3) {
+    return document.querySelectorAll('.student-pick-card input[type="checkbox"]:checked').length > 0;
+  }
   return true;
 }
 
@@ -140,11 +150,12 @@ wizard?.querySelectorAll('[data-wizard-next]').forEach((button) => {
     if (!canMoveFromStep(wizardStep)) {
       wizard.reportValidity();
       if (wizardStep === 2) alert('Selecciona al menos una pregunta para continuar.');
+      if (wizardStep === 3) alert('Selecciona al menos un alumno para continuar.');
       return;
     }
     if (wizardStep === 1) filterQuestionBank();
     if (wizardStep === 2) updateSelectedQuestions();
-    showWizardStep(Math.min(3, wizardStep + 1));
+    showWizardStep(Math.min(4, wizardStep + 1));
   });
 });
 
@@ -155,11 +166,85 @@ wizard?.querySelectorAll('[data-wizard-prev]').forEach((button) => {
 wizard?.addEventListener('submit', (event) => {
   updateSelectedQuestions();
   const selected = document.querySelectorAll('.question-pick.is-visible input[type="checkbox"]:checked').length;
-  if (selected === 0 || Number(examCount?.value || 0) > selected) {
+  const studentsSelected = document.querySelectorAll('.student-pick-card input[type="checkbox"]:checked').length;
+  if (selected === 0 || Number(examCount?.value || 0) > selected || studentsSelected === 0) {
     event.preventDefault();
-    showWizardStep(selected === 0 ? 2 : 3);
-    alert('Revisa la seleccion de preguntas y la cantidad solicitada.');
+    if (selected === 0) {
+      showWizardStep(2);
+    } else if (studentsSelected === 0) {
+      showWizardStep(3);
+    } else {
+      showWizardStep(4);
+    }
+    alert('Revisa la seleccion de preguntas, alumnos y la cantidad solicitada.');
   }
 });
 
 showWizardStep(1);
+
+/* ── Student Exam Drafts Autosave & Recovery ────────────────── */
+// 1. Update Responder -> Continuar buttons on exams list
+document.querySelectorAll('.exam-action-btn').forEach((btn) => {
+  const examId = btn.dataset.examId;
+  const draft = localStorage.getItem(`sigea_exam_draft_${examId}`);
+  if (draft && draft !== '{}') {
+    btn.textContent = 'Continuar';
+  }
+});
+
+// Clear any drafts for exams that are completed
+document.querySelectorAll('[data-clear-exam-id]').forEach((el) => {
+  const examId = el.dataset.clearExamId;
+  localStorage.removeItem(`sigea_exam_draft_${examId}`);
+});
+
+// 2. Draft Autosave/Restore on take_exam.php
+const examSheetForm = document.querySelector('form.exam-sheet');
+if (examSheetForm) {
+  const urlParams = new URLSearchParams(window.location.search);
+  const examId = urlParams.get('id');
+  if (examId) {
+    const storageKey = `sigea_exam_draft_${examId}`;
+    
+    // Restore from draft
+    const savedDraft = localStorage.getItem(storageKey);
+    if (savedDraft) {
+      try {
+        const draft = JSON.parse(savedDraft);
+        Object.keys(draft).forEach((qId) => {
+          const selectedIds = draft[qId];
+          selectedIds.forEach((optId) => {
+            const input = examSheetForm.querySelector(
+              `input[name="answers[${qId}]"][value="${optId}"], input[name="answers[${qId}][]"][value="${optId}"]`
+            );
+            if (input) {
+              input.checked = true;
+            }
+          });
+        });
+      } catch (e) {
+        console.error("Error restoring exam draft", e);
+      }
+    }
+    
+    // Auto-save on change
+    examSheetForm.addEventListener('change', () => {
+      const draft = {};
+      examSheetForm.querySelectorAll('input[type="radio"]:checked, input[type="checkbox"]:checked').forEach((input) => {
+        const match = input.name.match(/answers\[(\d+)\]/);
+        if (match) {
+          const qId = match[1];
+          if (!draft[qId]) {
+            draft[qId] = [];
+          }
+          draft[qId].push(input.value);
+        }
+      });
+      if (Object.keys(draft).length > 0) {
+        localStorage.setItem(storageKey, JSON.stringify(draft));
+      } else {
+        localStorage.removeItem(storageKey);
+      }
+    });
+  }
+}

@@ -27,13 +27,24 @@ render('header', compact('pageTitle'));
 <form class="panel exam-sheet" method="post">
     <h2><?= e($exam['title']) ?></h2>
     <p class="muted"><?= e($exam['subject_name']) ?> | UNIDAD <?= (int) $exam['unit'] ?> | <?= e($exam['teacher_name']) ?></p>
-    <?php foreach ($exam['questions'] as $index => $question): ?>
+    <?php foreach ($exam['questions'] as $index => $question): 
+        $isMultiple = $question['type'] === 'multiple_choice';
+    ?>
         <fieldset class="question-block">
-            <legend><?= ($index + 1) ?>. <?= e($question['text']) ?></legend>
+            <legend>
+                <?= ($index + 1) ?>. <?= e($question['text']) ?>
+                <?php if ($isMultiple): ?>
+                    <span style="font-size: 13px; font-weight: 500; color: var(--gray); font-style: italic;">(Puedes seleccionar más de una opción correcta)</span>
+                <?php endif; ?>
+            </legend>
             <p class="muted">UNIDAD <?= (int) $question['unit'] ?> | Puntos: <?= e($question['score']) ?></p>
             <?php foreach ($question['options'] as $option): ?>
                 <label class="option">
-                    <input type="radio" name="answers[<?= (int) $question['id'] ?>]" value="<?= (int) $option['id'] ?>" required>
+                    <?php if ($isMultiple): ?>
+                        <input type="checkbox" name="answers[<?= (int) $question['id'] ?>][]" value="<?= (int) $option['id'] ?>">
+                    <?php else: ?>
+                        <input type="radio" name="answers[<?= (int) $question['id'] ?>]" value="<?= (int) $option['id'] ?>" required>
+                    <?php endif; ?>
                     <?= e($option['option_text']) ?>
                 </label>
             <?php endforeach; ?>

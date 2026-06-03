@@ -45,12 +45,16 @@ class Exam
         ]);
         $bankQuestionId = (int) $db->lastInsertId();
 
-        $correctIndex = (int) ($data['correct'] ?? 0);
+        $correctIndexes = is_array($data['correct'] ?? null)
+            ? array_map('intval', $data['correct'])
+            : [(int) ($data['correct'] ?? 0)];
+
         $oStmt = $db->prepare(
             'INSERT INTO question_bank_options (bank_question_id, option_text, is_correct) VALUES (?, ?, ?)'
         );
         foreach ($options as $index => $optionText) {
-            $oStmt->execute([$bankQuestionId, trim($optionText), $index === $correctIndex ? 1 : 0]);
+            $isCorrect = in_array($index, $correctIndexes, true) ? 1 : 0;
+            $oStmt->execute([$bankQuestionId, trim($optionText), $isCorrect]);
         }
 
         $db->commit();
@@ -140,6 +144,16 @@ class Exam
         ]);
         $examId = (int) $db->lastInsertId();
 
+        $studentIds = array_map('intval', $data['students'] ?? []);
+        if (!$studentIds) {
+            throw new RuntimeException('Selecciona al menos un estudiante para asignar el examen.');
+        }
+
+        $esStmt = $db->prepare('INSERT INTO exam_students (exam_id, student_id) VALUES (?, ?)');
+        foreach ($studentIds as $studentId) {
+            $esStmt->execute([$examId, $studentId]);
+        }
+
         self::copyBankQuestionsToExam($bankQuestions, $examId);
         $db->commit();
         return $examId;
@@ -184,7 +198,7 @@ class Exam
              FROM exams e
              INNER JOIN subjects s ON s.id = e.subject_id
              INNER JOIN users u ON u.id = e.teacher_id
-             INNER JOIN teacher_students ts ON ts.teacher_id = e.teacher_id AND ts.student_id = ?
+             INNER JOIN exam_students es ON es.exam_id = e.id AND es.student_id = ?
              LEFT JOIN exam_attempts a ON a.exam_id = e.id AND a.student_id = ?
              WHERE e.is_published = 1
              ORDER BY e.created_at DESC"
@@ -247,17 +261,33 @@ class Exam
         );
 
         foreach ($exam['questions'] as $question) {
-            $selected = isset($answers[$question['id']]) ? (int) $answers[$question['id']] : null;
-            $correct = 0;
+            $correctOptionIds = [];
             foreach ($question['options'] as $option) {
-                if ((int) $option['id'] === $selected && (int) $option['is_correct'] === 1) {
-                    $correct = 1;
-                    break;
+                if ((int) $option['is_correct'] === 1) {
+                    $correctOptionIds[] = (int) $option['id'];
                 }
             }
-            $points = $correct ? (float) $question['score'] : 0;
+            
+            $selected = isset($answers[$question['id']]) ? $answers[$question['id']] : [];
+            if (!is_array($selected)) {
+                $selected = ($selected === '' || $selected === null) ? [] : [$selected];
+            }
+            $selectedIds = array_map('intval', $selected);
+            
+            sort($correctOptionIds);
+            sort($selectedIds);
+            $isCorrect = ($correctOptionIds === $selectedIds) ? 1 : 0;
+            $points = $isCorrect ? (float) $question['score'] : 0.00;
             $score += $points;
-            $answerStmt->execute([$attemptId, $question['id'], $selected, $correct, $points]);
+            
+            if (empty($selectedIds)) {
+                $answerStmt->execute([$attemptId, $question['id'], null, 0, 0.00]);
+            } else {
+                foreach ($selectedIds as $i => $optId) {
+                    $rowPoints = ($i === 0) ? $points : 0.00;
+                    $answerStmt->execute([$attemptId, $question['id'], $optId, $isCorrect, $rowPoints]);
+                }
+            }
         }
 
         $db->prepare('UPDATE exam_attempts SET score = ? WHERE id = ?')->execute([$score, $attemptId]);
@@ -301,6 +331,70 @@ class Exam
         );
         $stmt->execute([$teacherId]);
         return $stmt->fetchAll();
+    }
+
+    public static function attemptFullDetail(int $attemptId): ?array
+    {
+        $db = Database::get();
+
+        // Fetch the attempt with exam + student + subject + teacher info
+        $stmt = $db->prepare(
+            "SELECT a.*, a.id AS attempt_id,
+                    e.title, e.unit, e.description AS exam_description,
+                    s.name AS subject_name,
+                    u_t.name AS teacher_name,
+                    u_s.name AS student_name,
+                    u_s.email AS student_email
+             FROM exam_attempts a
+             INNER JOIN exams e ON e.id = a.exam_id
+             INNER JOIN subjects s ON s.id = e.subject_id
+             INNER JOIN users u_t ON u_t.id = e.teacher_id
+             INNER JOIN users u_s ON u_s.id = a.student_id
+             WHERE a.id = ?"
+        );
+        $stmt->execute([$attemptId]);
+        $attempt = $stmt->fetch();
+        if (!$attempt) {
+            return null;
+        }
+
+        // Fetch all questions for this exam
+        $qStmt = $db->prepare('SELECT * FROM questions WHERE exam_id = ? ORDER BY id');
+        $qStmt->execute([$attempt['exam_id']]);
+        $questions = $qStmt->fetchAll();
+
+        // For each question: fetch options and the student's selected answers
+        $oStmt = $db->prepare('SELECT * FROM question_options WHERE question_id = ? ORDER BY id');
+        $ansStmt = $db->prepare(
+            'SELECT option_id, is_correct, points FROM exam_answers WHERE attempt_id = ? AND question_id = ?'
+        );
+
+        foreach ($questions as &$question) {
+            $oStmt->execute([$question['id']]);
+            $question['options'] = $oStmt->fetchAll();
+
+            $ansStmt->execute([$attemptId, $question['id']]);
+            $rows = $ansStmt->fetchAll();
+
+            $selectedIds = [];
+            $isCorrect = 0;
+            $pointsEarned = 0;
+            foreach ($rows as $row) {
+                if ($row['option_id'] !== null) {
+                    $selectedIds[] = (int) $row['option_id'];
+                }
+                $isCorrect = (int) $row['is_correct'];
+                $pointsEarned += (float) $row['points'];
+            }
+
+            $question['selected_option_ids'] = $selectedIds;
+            $question['is_correct']          = $isCorrect;
+            $question['points_earned']       = $pointsEarned;
+        }
+        unset($question);
+
+        $attempt['questions'] = $questions;
+        return $attempt;
     }
 
     public static function validateAttempt(int $attemptId, int $teacherId): void

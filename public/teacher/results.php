@@ -9,7 +9,6 @@ if (is_post()) {
 }
 
 $results = Exam::resultsForTeacher($user['id']);
-$stats = Exam::statsByUnitForTeacher($user['id']);
 $pageTitle = 'Validar resultados';
 render('header', compact('pageTitle'));
 ?>
@@ -28,29 +27,27 @@ render('header', compact('pageTitle'));
                     <td><?= e($result['score']) ?>/<?= e($result['total_score']) ?></td>
                     <td><?= $result['validated_at'] ? 'Validado' : 'Pendiente' ?></td>
                     <td>
-                        <?php if (!$result['validated_at']): ?>
-                            <form method="post" class="inline-form">
-                                <input type="hidden" name="attempt_id" value="<?= (int) $result['id'] ?>">
-                                <button class="button button-primary" type="submit">Validar</button>
-                            </form>
-                        <?php endif; ?>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <a class="button button-ghost" href="/teacher/validate.php?attempt_id=<?= (int) $result['id'] ?>" style="min-height:36px;padding:6px 12px;">
+                                <span class="material-symbols-rounded" style="font-size:18px;">visibility</span>
+                                Ver examen
+                            </a>
+                            <?php if (!$result['validated_at']): ?>
+                                <form method="post" class="inline-form" style="margin:0;">
+                                    <input type="hidden" name="attempt_id" value="<?= (int) $result['id'] ?>">
+                                    <button class="button button-primary" type="submit" style="min-height:36px;padding:6px 12px;">
+                                        <span class="material-symbols-rounded" style="font-size:18px;">check_circle</span>
+                                        Validar
+                                    </button>
+                                </form>
+                            <?php endif; ?>
+                        </div>
                     </td>
                 </tr>
             <?php endforeach; ?>
             <?php if (!$results): ?><tr><td colspan="7">Aun no hay resultados.</td></tr><?php endif; ?>
             </tbody>
         </table>
-    </div>
-</section>
-<section class="panel">
-    <h2>Estadisticas por unidad</h2>
-    <div class="stats-bars">
-        <?php foreach ($stats as $row): ?>
-            <div>
-                <span>UNIDAD <?= (int) $row['unit'] ?> (<?= e($row['accuracy']) ?>%)</span>
-                <meter min="0" max="100" value="<?= e($row['accuracy']) ?>"></meter>
-            </div>
-        <?php endforeach; ?>
     </div>
 </section>
 <?php render('footer'); ?>
